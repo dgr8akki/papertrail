@@ -1,0 +1,6 @@
+.venv/
+.chroma/
+__pycache__/
+*.pyc
+.pytest_cache/
+evals/sample.pdf
