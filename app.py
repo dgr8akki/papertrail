@@ -2,61 +2,83 @@
 
 import hashlib
 
+import gradio as gr
 import pymupdf
-import streamlit as st
 
 from papertrail.index import build_index, retrieve
 from papertrail.ingest import ingest
 from papertrail.rag import answer
 
-st.set_page_config(page_title="PaperTrail", page_icon="📄")
-st.title("📄 PaperTrail")
-st.caption("Ask questions about a PDF — every answer cites the exact page and paragraph, highlighted on the page.")
 
-pdf = st.file_uploader("Upload a PDF", type="pdf")
-if not pdf:
-    st.stop()
-
-pdf_bytes = pdf.getvalue()
-doc_id = "doc-" + hashlib.sha256(pdf_bytes).hexdigest()[:16]
-if st.session_state.get("doc_id") != doc_id:
-    with st.spinner("Chunking and indexing…"):
-        build_index(doc_id, ingest(pdf_bytes))
-    st.session_state.update(doc_id=doc_id, pdf=pdf_bytes, history=[])
+def load_pdf(pdf_path: str | None):
+    if not pdf_path:
+        return None, None, "Upload a PDF to begin."
+    with open(pdf_path, "rb") as f:
+        pdf_bytes = f.read()
+    doc_id = "doc-" + hashlib.sha256(pdf_bytes).hexdigest()[:16]
+    build_index(doc_id, ingest(pdf_bytes))
+    return doc_id, pdf_bytes, "Indexed — ask a question below."
 
 
-def page_image(page_no: int, bbox) -> bytes:
+def page_image(pdf_bytes: bytes, page_no: int, bbox) -> bytes:
     """Render one PDF page as PNG, with the cited paragraph outlined in red."""
-    doc = pymupdf.open(stream=st.session_state["pdf"], filetype="pdf")
+    doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     page = doc[page_no - 1]
     if bbox:
         page.draw_rect(pymupdf.Rect(*bbox), color=(1, 0, 0), width=2)
-    return page.get_pixmap(dpi=110).tobytes("png")
+    png = page.get_pixmap(dpi=110).tobytes("png")
+    doc.close()
+    return png
 
 
-def render_citations(citations):
-    for c in citations:
-        with st.expander(f"[{c['n']}] page {c['page']}"):
-            st.image(page_image(c["page"], c["bbox"]))
+def ask(question: str, history: list, doc_id: str | None, pdf_bytes: bytes | None):
+    if not doc_id:
+        return history + [{"role": "assistant", "content": "Upload a PDF first."}], [], question
+
+    chunks = retrieve(doc_id, question)
+    result = answer(question, chunks)
+    text = result["answer"]
+    if not result["grounded"]:
+        text += "\n\n⚠️ No citation survived verification — treat this answer with suspicion."
+
+    history = history + [
+        {"role": "user", "content": question},
+        {"role": "assistant", "content": text},
+    ]
+    gallery = [
+        (page_image(pdf_bytes, c["page"], c["bbox"]), f"[{c['n']}] page {c['page']}")
+        for c in result["citations"]
+    ]
+    return history, gallery, ""
 
 
-for msg in st.session_state["history"]:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
-        render_citations(msg.get("citations", []))
-
-if question := st.chat_input("Ask about the document"):
-    st.session_state["history"].append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
-    with st.chat_message("assistant"):
-        with st.spinner("Thinking…"):
-            chunks = retrieve(st.session_state["doc_id"], question)
-            result = answer(question, chunks)
-        st.markdown(result["answer"])
-        if not result["grounded"]:
-            st.warning("No citation survived verification — treat this answer with suspicion.")
-        render_citations(result["citations"])
-    st.session_state["history"].append(
-        {"role": "assistant", "content": result["answer"], "citations": result["citations"]}
+with gr.Blocks(title="PaperTrail") as demo:
+    gr.Markdown(
+        "# 📄 PaperTrail\n"
+        "Ask questions about a PDF — every answer cites the exact page, "
+        "verified and shown highlighted on the source page below."
     )
+    doc_id_state = gr.State(None)
+    pdf_bytes_state = gr.State(None)
+
+    pdf_upload = gr.File(label="Upload a PDF", file_types=[".pdf"], type="filepath")
+    status = gr.Markdown()
+    chatbot = gr.Chatbot(label="Chat")
+    question = gr.Textbox(label="Ask about the document", placeholder="What is the main contribution?")
+    ask_btn = gr.Button("Ask", variant="primary")
+    citations_gallery = gr.Gallery(label="Verified citations", columns=2, height=300)
+
+    pdf_upload.change(load_pdf, inputs=pdf_upload, outputs=[doc_id_state, pdf_bytes_state, status])
+    ask_btn.click(
+        ask,
+        inputs=[question, chatbot, doc_id_state, pdf_bytes_state],
+        outputs=[chatbot, citations_gallery, question],
+    )
+    question.submit(
+        ask,
+        inputs=[question, chatbot, doc_id_state, pdf_bytes_state],
+        outputs=[chatbot, citations_gallery, question],
+    )
+
+if __name__ == "__main__":
+    demo.launch()

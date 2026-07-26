@@ -5,7 +5,10 @@ Usage:
     curl -L -o evals/sample.pdf https://arxiv.org/pdf/1706.03762
     GROQ_API_KEY=... python evals/run_eval.py evals/sample.pdf evals/golden.jsonl
 
-Uses the same Groq model as the app as the judge LLM. Metrics are the
+Judges with a separate, lighter Groq model than the one used for
+generation — Groq's free tier enforces a per-model daily token quota,
+so sharing one model between "answer 12 questions" and "judge 12
+questions x 3 metrics" burns through it fast. Metrics are the
 LLM-judged trio that needs no extra embedding model: faithfulness,
 context precision, context recall.
 """
@@ -19,10 +22,15 @@ from langchain_openai import ChatOpenAI
 from ragas import EvaluationDataset, evaluate
 from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import context_precision, context_recall, faithfulness
+from ragas.run_config import RunConfig
 
 from papertrail.index import build_index, retrieve
 from papertrail.ingest import ingest
-from papertrail.rag import MODEL, answer
+from papertrail.rag import answer
+
+# ponytail: separate model from generation's, so judging doesn't compete
+# with generation for the same daily token quota on Groq's free tier.
+JUDGE_MODEL = os.environ.get("RAGAS_JUDGE_MODEL", "llama-3.1-8b-instant")
 
 pdf_path, golden_path = sys.argv[1], sys.argv[2]
 
@@ -49,7 +57,7 @@ with open(golden_path) as f:
 
 judge = LangchainLLMWrapper(
     ChatOpenAI(
-        model=MODEL,
+        model=JUDGE_MODEL,
         base_url="https://api.groq.com/openai/v1",
         api_key=os.environ["GROQ_API_KEY"],
         temperature=0,
@@ -59,5 +67,8 @@ scores = evaluate(
     EvaluationDataset.from_list(rows),
     metrics=[faithfulness, context_precision, context_recall],
     llm=judge,
+    # ponytail: max_workers=2 to stay under Groq's free-tier rate limit;
+    # raise if you're on a paid tier and want faster runs.
+    run_config=RunConfig(max_workers=2),
 )
 print(scores)

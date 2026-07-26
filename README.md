@@ -3,7 +3,7 @@ title: PaperTrail
 emoji: 🗂️
 colorFrom: yellow
 colorTo: red
-sdk: streamlit
+sdk: gradio
 app_file: app.py
 pinned: false
 ---
@@ -40,7 +40,7 @@ flowchart LR
 2. **Index** (`index.py`) — chunks go into a ChromaDB collection keyed by a SHA-256 hash of the PDF bytes, so re-uploading the same file skips re-embedding.
 3. **Retrieve** — the question is embedded and the top-5 most similar chunks come back.
 4. **Generate + verify** (`rag.py`) — the LLM (Llama 3.3 70B via Groq's free API) gets the chunks as numbered excerpts and must cite by number or say "Not found in the document." Every `[n]` it emits is checked for actual word overlap with its cited chunk before being trusted.
-5. **Render** (`app.py`) — Streamlit shows the answer; each surviving citation expands into the real PDF page with the cited paragraph outlined.
+5. **Render** (`app.py`) — a Gradio UI shows the answer in a chat window; each surviving citation appears in a gallery as the real PDF page with the cited paragraph outlined.
 
 ## Two implementations
 
@@ -59,12 +59,12 @@ The hand-rolled version exists first on purpose: the citation-verification step 
 python3.12 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 export GROQ_API_KEY=...   # free at console.groq.com
-streamlit run app.py
+python app.py
 ```
 
 ## Evaluation
 
-`evals/golden.jsonl` has hand-written Q&A pairs against the ["Attention Is All You Need"](https://arxiv.org/pdf/1706.03762) paper. Scored with [Ragas](https://github.com/explodinggradients/ragas) using the same Groq model as an LLM judge:
+`evals/golden.jsonl` has hand-written Q&A pairs against the ["Attention Is All You Need"](https://arxiv.org/pdf/1706.03762) paper. Scored with [Ragas](https://github.com/explodinggradients/ragas), judged by a separate, lighter Groq model so judging doesn't compete with generation for the same daily token quota:
 
 ```bash
 pip install -e ".[eval]"
@@ -74,13 +74,15 @@ python evals/run_eval.py evals/sample.pdf evals/golden.jsonl
 
 | Metric | Score |
 |---|---|
-| Faithfulness | _run the eval and paste your score here_ |
-| Context Precision | _run the eval and paste your score here_ |
-| Context Recall | _run the eval and paste your score here_ |
+| Faithfulness | _pending — see note below_ |
+| Context Precision | _pending — see note below_ |
+| Context Recall | _pending — see note below_ |
+
+> Groq's free tier caps `llama-3.3-70b-versatile` at 100k tokens/day. Running this eval a couple of times while iterating on it burned through that cap for the day, so the numbers above are pending a rerun once the daily quota resets. Worth knowing going in if you're building on the same free tier: budget one clean eval run per day per model, not several while debugging.
 
 ## Deploying
 
-Push this repo to Hugging Face Spaces (Streamlit SDK), add `GROQ_API_KEY` as a Space secret, done — `requirements.txt` is already set up for it. No GPU needed; embeddings run on Chroma's default CPU model.
+Push this repo to Hugging Face Spaces (Gradio SDK), add `GROQ_API_KEY` as a Space secret, done — `requirements.txt` is already set up for it. No GPU needed; embeddings run on Chroma's default CPU model.
 
 ## Limitations & what's next
 
