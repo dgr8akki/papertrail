@@ -1,3 +1,13 @@
+---
+title: PaperTrail
+emoji: 🗂️
+colorFrom: yellow
+colorTo: red
+sdk: streamlit
+app_file: app.py
+pinned: false
+---
+
 # PaperTrail
 
 Chat with a PDF. Every claim in the answer is cited by page number, and every citation is **programmatically verified** against the retrieved text before it's shown — not just asserted by the model.
