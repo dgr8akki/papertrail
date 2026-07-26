@@ -1,13 +1,3 @@
----
-title: PaperTrail
-emoji: 🗂️
-colorFrom: yellow
-colorTo: red
-sdk: gradio
-app_file: app.py
-pinned: false
----
-
 # PaperTrail
 
 Chat with a PDF. Every claim in the answer is cited by page number, and every citation is **programmatically verified** against the retrieved text before it's shown — not just asserted by the model.
@@ -82,7 +72,14 @@ python evals/run_eval.py evals/sample.pdf evals/golden.jsonl
 
 ## Deploying
 
-Push this repo to Hugging Face Spaces (Gradio SDK), add `GROQ_API_KEY` as a Space secret, done — `requirements.txt` is already set up for it. No GPU needed; embeddings run on Chroma's default CPU model.
+Deployed on [Render](https://render.com)'s free tier via the included `render.yaml` blueprint:
+
+1. Push this repo to GitHub (already done if you're reading this there).
+2. On Render: **New +** → **Blueprint** → connect the repo. It reads `render.yaml` automatically.
+3. Render prompts for `GROQ_API_KEY` (marked `sync: false` in the blueprint so it's never committed) — paste it in.
+4. Deploy. No GPU needed; embeddings run on Chroma's default CPU model.
+
+Free-tier services spin down after 15 minutes idle, so the first request after a quiet period takes ~30-60s to cold-start — normal, not a bug.
 
 ## Limitations & what's next
 

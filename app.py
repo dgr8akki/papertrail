@@ -1,6 +1,7 @@
 """PaperTrail — chat with a PDF, with citations you can actually verify."""
 
 import hashlib
+import os
 
 import gradio as gr
 import pymupdf
@@ -81,4 +82,4 @@ with gr.Blocks(title="PaperTrail") as demo:
     )
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", server_port=int(os.environ.get("PORT", 7860)))
