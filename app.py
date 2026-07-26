@@ -1,10 +1,12 @@
 """PaperTrail — chat with a PDF, with citations you can actually verify."""
 
 import hashlib
+import io
 import os
 
 import gradio as gr
 import pymupdf
+from PIL import Image
 
 from papertrail.index import build_index, retrieve
 from papertrail.ingest import ingest
@@ -21,15 +23,15 @@ def load_pdf(pdf_path: str | None):
     return doc_id, pdf_bytes, "Indexed — ask a question below."
 
 
-def page_image(pdf_bytes: bytes, page_no: int, bbox) -> bytes:
-    """Render one PDF page as PNG, with the cited paragraph outlined in red."""
+def page_image(pdf_bytes: bytes, page_no: int, bbox) -> Image.Image:
+    """Render one PDF page as an image, with the cited paragraph outlined in red."""
     doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     page = doc[page_no - 1]
     if bbox:
         page.draw_rect(pymupdf.Rect(*bbox), color=(1, 0, 0), width=2)
     png = page.get_pixmap(dpi=110).tobytes("png")
     doc.close()
-    return png
+    return Image.open(io.BytesIO(png))
 
 
 def ask(question: str, history: list, doc_id: str | None, pdf_bytes: bytes | None):
