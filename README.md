@@ -2,7 +2,7 @@
 
 Chat with a PDF. Every claim in the answer is cited by page number, and every citation is **programmatically verified** against the retrieved text before it's shown — not just asserted by the model.
 
-**[Live demo](#deploying) · Built as a from-scratch RAG project to learn the mechanics, not just wire up a framework.**
+**[Live demo](https://papertrail-ljg4.onrender.com/) · Built as a from-scratch RAG project to learn the mechanics, not just wire up a framework.**
 
 ## Why this one is different
 
@@ -72,7 +72,7 @@ python evals/run_eval.py evals/sample.pdf evals/golden.jsonl
 
 ## Deploying
 
-Deployed on [Render](https://render.com)'s free tier via the included `render.yaml` blueprint:
+Live at **https://papertrail-ljg4.onrender.com/**, deployed on [Render](https://render.com)'s free tier via the included `render.yaml` blueprint:
 
 1. Push this repo to GitHub (already done if you're reading this there).
 2. On Render: **New +** → **Blueprint** → connect the repo. It reads `render.yaml` automatically.
